@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  name             String?
+  avatar           String?
+  googleId         String?           @unique
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  emails           ScheduledEmail[]
+  slackIntegration SlackIntegration?
+
+  @@map("users")
+}
+
+model ScheduledEmail {
+  id                 String    @id @default(uuid())
+  userId             String?
+  user               User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipient          String
+  subject            String
+  body               String
+  senderEmail        String
+  scheduledTime      DateTime
+  status             String    @default("SCHEDULED") // SCHEDULED, PROCESSING, SENT, FAILED, CANCELLED, RATE_LIMITED
+  jobId              String?   @unique
+  delaySeconds       Int       @default(2)
+  hourlyLimit        Int       @default(50)
+  sentAt             DateTime?
+  failedAt           DateTime?
+  errorMessage       String?
+  etherealPreviewUrl String?
+  messageId          String?
+  attempts           Int       @default(0)
+  lastAttemptAt      DateTime?
+  rescheduledCount   Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([status, scheduledTime])
+  @@index([senderEmail, status])
+  @@index([userId])
+  @@map("scheduled_emails")
+}
+
+model SlackIntegration {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId      String?
+  teamName    String?
+  channelId   String?
+  channelName String?
+  accessToken String?
+  webhookUrl  String?
+  botUserId   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("slack_integrations")
+}
+
+model RateLimitIncident {
+  id          String   @id @default(uuid())
+  senderEmail String
+  hourWindow  String   // e.g. "2026-09-27T16"
+  count       Int
+  limit       Int
+  slackSent   Boolean  @default(false)
+  timestamp   DateTime @default(now())
+
+  @@index([senderEmail, hourWindow])
+  @@map("rate_limit_incidents")
+}
